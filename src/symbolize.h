@@ -1,4 +1,4 @@
-// Copyright (c) 2024, Google Inc.
+// Copyright (c) 2006, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -51,86 +51,59 @@
 // malloc() and other unsafe operations.  It should be both
 // thread-safe and async-signal-safe.
 
-#ifndef GLOG_INTERNAL_SYMBOLIZE_H
-#define GLOG_INTERNAL_SYMBOLIZE_H
+#ifndef BASE_SYMBOLIZE_H_
+#define BASE_SYMBOLIZE_H_
 
-#include <cstddef>
-#include <cstdint>
-#include <type_traits>
-
+#include "utilities.h"
 #include "config.h"
-#include "glog/platform.h"
-
-#if defined(HAVE_LINK_H)
-#  include <link.h>  // For ElfW() macro.
-#elif defined(HAVE_ELF_H)
-#  include <elf.h>
-#elif defined(HAVE_SYS_EXEC_ELF_H)
-#  include <sys/exec_elf.h>
-#endif
-
-#if defined(GLOG_USE_GLOG_EXPORT)
-#  include "glog/export.h"
-#endif
-
-#if !defined(GLOG_NO_EXPORT)
-#  error "symbolize.h" was not included correctly.
-#endif
-
-// We prefer to let the build system detect the availability of certain features
-// such as symbolization support. HAVE_SYMBOLIZE should therefore be defined by
-// the build system in general unless there is a good reason to perform the
-// detection using the preprocessor.
-#ifndef GLOG_NO_SYMBOLIZE_DETECTION
-#  ifndef HAVE_SYMBOLIZE
-// defined by gcc
-#    if defined(HAVE_ELF_H) || defined(HAVE_SYS_EXEC_ELF_H)
-#      define HAVE_SYMBOLIZE
-#    elif defined(GLOG_OS_MACOSX) && defined(HAVE_DLADDR)
-// Use dladdr to symbolize.
-#      define HAVE_SYMBOLIZE
-#    elif defined(GLOG_OS_WINDOWS)
-// Use DbgHelp to symbolize
-#      define HAVE_SYMBOLIZE
-#    endif
-#  endif  // !defined(HAVE_SYMBOLIZE)
-#endif    // !defined(GLOG_NO_SYMBOLIZE_DETECTION)
+#include <glog/logging.h>
 
 #ifdef HAVE_SYMBOLIZE
 
-#  if !defined(SIZEOF_VOID_P) && defined(__SIZEOF_POINTER__)
-#    define SIZEOF_VOID_P __SIZEOF_POINTER__
-#  endif
+#if defined(__ELF__)  // defined by gcc
+#if defined(__OpenBSD__)
+#include <sys/exec_elf.h>
+#else
+#include <elf.h>
+#endif
 
-#  if defined(HAVE_ELF_H) || defined(HAVE_SYS_EXEC_ELF_H)
+#if !defined(ANDROID)
+#include <link.h>  // For ElfW() macro.
+#endif
+
+// For systems where SIZEOF_VOID_P is not defined, determine it
+// based on __LP64__ (defined by gcc on 64-bit systems)
+#if !defined(SIZEOF_VOID_P)
+# if defined(__LP64__)
+#  define SIZEOF_VOID_P 8
+# else
+#  define SIZEOF_VOID_P 4
+# endif
+#endif
 
 // If there is no ElfW macro, let's define it by ourself.
-#    ifndef ElfW
-#      if SIZEOF_VOID_P == 4
-#        define ElfW(type) Elf32_##type
-#      elif SIZEOF_VOID_P == 8
-#        define ElfW(type) Elf64_##type
-#      else
-#        error "Unknown sizeof(void *)"
-#      endif
-#    endif
+#ifndef ElfW
+# if SIZEOF_VOID_P == 4
+#  define ElfW(type) Elf32_##type
+# elif SIZEOF_VOID_P == 8
+#  define ElfW(type) Elf64_##type
+# else
+#  error "Unknown sizeof(void *)"
+# endif
+#endif
 
-namespace google {
-inline namespace glog_internal_namespace_ {
+_START_GOOGLE_NAMESPACE_
 
 // Gets the section header for the given name, if it exists. Returns true on
 // success. Otherwise, returns false.
-GLOG_NO_EXPORT
-bool GetSectionHeaderByName(int fd, const char* name, size_t name_len,
-                            ElfW(Shdr) * out);
+bool GetSectionHeaderByName(int fd, const char *name, size_t name_len,
+                            ElfW(Shdr) *out);
 
-}  // namespace glog_internal_namespace_
-}  // namespace google
+_END_GOOGLE_NAMESPACE_
 
-#  endif
+#endif  /* __ELF__ */
 
-namespace google {
-inline namespace glog_internal_namespace_ {
+_START_GOOGLE_NAMESPACE_
 
 // Restrictions on the callbacks that follow:
 //  - The callbacks must not use heaps but only use stacks.
@@ -143,8 +116,12 @@ inline namespace glog_internal_namespace_ {
 // counter "pc". The callback function should write output to "out"
 // and return the size of the output written. On error, the callback
 // function should return -1.
-using SymbolizeCallback = int (*)(int, void*, char*, size_t, uint64_t);
-GLOG_NO_EXPORT
+typedef int (*SymbolizeCallback)(int fd,
+                                 void* pc,
+                                 char* out,
+                                 size_t out_size,
+                                 uint64_t relocation);
+GLOG_EXPORT
 void InstallSymbolizeCallback(SymbolizeCallback callback);
 
 // Installs a callback function, which will be called instead of
@@ -157,54 +134,26 @@ void InstallSymbolizeCallback(SymbolizeCallback callback);
 // file is opened successfully, returns the file descriptor.  Otherwise,
 // returns -1.  |out_file_name_size| is the size of the file name buffer
 // (including the null-terminator).
-using SymbolizeOpenObjectFileCallback = int (*)(uint64_t, uint64_t&, uint64_t&,
-                                                char*, size_t);
-GLOG_NO_EXPORT
+typedef int (*SymbolizeOpenObjectFileCallback)(uint64_t pc,
+                                               uint64_t& start_address,
+                                               uint64_t& base_address,
+                                               char* out_file_name,
+                                               size_t out_file_name_size);
 void InstallSymbolizeOpenObjectFileCallback(
     SymbolizeOpenObjectFileCallback callback);
 
-}  // namespace glog_internal_namespace_
-}  // namespace google
+_END_GOOGLE_NAMESPACE_
 
 #endif
 
-namespace google {
-inline namespace glog_internal_namespace_ {
-
-#if defined(HAVE_SYMBOLIZE)
-
-enum class SymbolizeOptions {
-  // No additional options.
-  kNone = 0,
-  // Do not display source and line numbers in the symbolized output.
-  kNoLineNumbers = 1
-};
-
-constexpr SymbolizeOptions operator&(SymbolizeOptions lhs,
-                                     SymbolizeOptions rhs) noexcept {
-  return static_cast<SymbolizeOptions>(
-      static_cast<std::underlying_type_t<SymbolizeOptions>>(lhs) &
-      static_cast<std::underlying_type_t<SymbolizeOptions>>(rhs));
-}
-
-constexpr SymbolizeOptions operator|(SymbolizeOptions lhs,
-                                     SymbolizeOptions rhs) noexcept {
-  return static_cast<SymbolizeOptions>(
-      static_cast<std::underlying_type_t<SymbolizeOptions>>(lhs) |
-      static_cast<std::underlying_type_t<SymbolizeOptions>>(rhs));
-}
+_START_GOOGLE_NAMESPACE_
 
 // Symbolizes a program counter.  On success, returns true and write the
 // symbol name to "out".  The symbol name is demangled if possible
 // (supports symbols generated by GCC 3.x or newer).  Otherwise,
 // returns false.
-GLOG_NO_EXPORT bool Symbolize(
-    void* pc, char* out, size_t out_size,
-    SymbolizeOptions options = SymbolizeOptions::kNone);
+GLOG_EXPORT bool Symbolize(void* pc, char* out, size_t out_size);
 
-#endif  // defined(HAVE_SYMBOLIZE)
+_END_GOOGLE_NAMESPACE_
 
-}  // namespace glog_internal_namespace_
-}  // namespace google
-
-#endif  // GLOG_INTERNAL_SYMBOLIZE_H
+#endif  // BASE_SYMBOLIZE_H_

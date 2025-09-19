@@ -4,12 +4,8 @@ on: [push, pull_request]
 
 jobs:
   build-msvc:
-    name: ${{matrix.msvc}}-${{matrix.arch}}-C++${{matrix.std}}-${{matrix.build_type}}-${{matrix.lib}}
+    name: ${{matrix.msvc}}-${{matrix.arch}}-C++${{matrix.std}}-${{matrix.build_type}}-${{matrix.lib}}-${{matrix.extra}}
     runs-on: ${{matrix.os}}
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
     defaults:
       run:
         shell: powershell
@@ -21,9 +17,11 @@ jobs:
       matrix:
         arch: [Win32, x64]
         build_type: [Debug, Release]
+        extra: [no-custom-prefix, custom-prefix]
         lib: [shared, static]
         msvc: [VS-16-2019, VS-17-2022]
-        std: [14, 17, 20, 23]
+        # Visual Studio 17 2022 does not support C++11 and older language standard
+        std: [14, 17, 20]
         include:
           - msvc: VS-16-2019
             os: windows-2019
@@ -33,30 +31,25 @@ jobs:
             generator: 'Visual Studio 17 2022'
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: cpp
+      - uses: actions/checkout@v2
 
       - name: Cache GTest
         id: cache-gtest
-        uses: actions/cache@v4
+        uses: actions/cache@v2
         with:
           path: gtest/
-          key: ${{runner.os}}-gtest-1.14-${{matrix.lib}}-${{matrix.arch}}-${{matrix.build_type}}
+          key: ${{runner.os}}-gtest-1.11-${{matrix.lib}}-${{matrix.arch}}-${{matrix.build_type}}
 
       - name: Download GTest
         if: steps.cache-gtest.outputs.cache-hit != 'true'
         run: |
-          (New-Object System.Net.WebClient).DownloadFile("https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip", "v1.14.0.zip")
-          Expand-Archive v1.14.0.zip .
+          (New-Object System.Net.WebClient).DownloadFile("https://github.com/google/googletest/archive/refs/tags/release-1.11.0.zip", "release-1.11.0.zip")
+          Expand-Archive release-1.11.0.zip .
 
       - name: Build GTest
         if: steps.cache-gtest.outputs.cache-hit != 'true'
         run: |
-          cmake -S googletest-1.14.0 -B build-googletest `
+          cmake -S googletest-release-1.11.0 -B build-googletest `
                 -A ${{matrix.arch}} `
                 -DBUILD_SHARED_LIBS=${{matrix.lib == 'shared'}} `
                 -Dgtest_force_shared_crt=ON `
@@ -67,7 +60,7 @@ jobs:
 
       - name: Cache gflags
         id: cache-gflags
-        uses: actions/cache@v4
+        uses: actions/cache@v2
         with:
           path: gflags/
           key: ${{runner.os}}-gflags-2.2.2-${{matrix.lib}}-${{matrix.arch}}-${{matrix.build_type}}
@@ -113,6 +106,7 @@ jobs:
                 -DCMAKE_EXE_LINKER_FLAGS_RELEASE='/INCREMENTAL:NO /DEBUG' `
                 -DCMAKE_INSTALL_PREFIX:PATH=./install `
                 -DCMAKE_MSVC_RUNTIME_LIBRARY='MultiThreaded$<$<CONFIG:Debug>:Debug>DLL' `
+                -DWITH_CUSTOM_PREFIX=${{matrix.extra == 'custom-prefix'}} `
                 -G "${{matrix.generator}}" `
                 -Werror
 
@@ -134,20 +128,11 @@ jobs:
                 --config ${{matrix.build_type}} `
                 --target install
 
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: language:cpp
-
   build-mingw:
-    name: ${{matrix.sys}}-${{matrix.env}}-C++${{matrix.std}}-${{matrix.build_type}}-${{matrix.lib}}
+    name: ${{matrix.sys}}-${{matrix.env}}-C++${{matrix.std}}-${{matrix.build_type}}-${{matrix.lib}}-${{matrix.extra}}
     runs-on: windows-2022
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
     env:
-      BUILDDIR: 'build_${{matrix.sys}}-${{matrix.env}}-C++${{matrix.std}}-${{matrix.build_type}}-${{matrix.lib}}'
+      BUILDDIR: 'build_${{matrix.sys}}-${{matrix.env}}-C++${{matrix.std}}-${{matrix.build_type}}-${{matrix.lib}}-${{matrix.extra}}'
     defaults:
       run:
         shell: msys2 {0}
@@ -155,8 +140,9 @@ jobs:
       fail-fast: true
       matrix:
         build_type: [Debug]
+        extra: [no-custom-prefix, custom-prefix]
         lib: [shared, static]
-        std: [14, 17, 20, 23]
+        std: [98, 11, 14, 17, 20]
         sys: [mingw32, mingw64]
         include:
          - sys: mingw32
@@ -165,30 +151,21 @@ jobs:
            env: x86_64
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: cpp
-
+      - uses: actions/checkout@v2
       - uses: msys2/setup-msys2@v2
         with:
           msystem: ${{matrix.sys}}
           install: >-
+            lcov
             mingw-w64-${{matrix.env}}-cmake
             mingw-w64-${{matrix.env}}-gcc
             mingw-w64-${{matrix.env}}-gflags
             mingw-w64-${{matrix.env}}-ninja
-            mingw-w64-${{matrix.env}}-python-jinja
-            mingw-w64-${{matrix.env}}-python-lxml
-            mingw-w64-${{matrix.env}}-python-pip
-            mingw-w64-${{matrix.env}}-python-pygments
 
-      - name: Setup Coverage Dependencies
-        if: matrix.build_type == 'Debug'
+      - name: Setup C++98 Environment
+        if: matrix.std == '98'
         run: |
-          pip install 'gcovr==7.0'
+          echo 'CXXFLAGS=-Wno-error=variadic-macros -Wno-error=long-long ${{env.CXXFLAGS}}' >> $GITHUB_ENV
 
       - name: Setup Environment
         if: matrix.build_type == 'Debug'
@@ -206,6 +183,7 @@ jobs:
                 -DCMAKE_CXX_STANDARD=${{matrix.std}} \
                 -DCMAKE_CXX_STANDARD_REQUIRED=ON \
                 -DCMAKE_INSTALL_PREFIX:PATH=./install \
+                -DWITH_CUSTOM_PREFIX=${{matrix.extra == 'custom-prefix'}} \
                 -G Ninja \
                 -Werror
 
@@ -229,17 +207,28 @@ jobs:
       - name: Generate Coverage
         if: matrix.build_type == 'Debug'
         run: |
-          cd build_${{matrix.build_type}}
-          gcovr -r .. . -s --cobertura coverage.xml
+          lcov --directory . --capture --output-file coverage.info
+          lcov --remove coverage.info \
+            '*/install/include/*' \
+            '*/msys64/mingw32/*' \
+            '*/msys64/mingw64/*' \
+            '*/src/*_unittest.cc' \
+            '*/src/googletest.h' \
+            '*/src/mock-log.h' \
+            --output-file coverage.info
+
+          for file in src/glog/*.h.in; do
+            name=$(basename ${file})
+            name_we=${name%.h.in}
+            sed -i "s|build_${{matrix.build_type}}/glog/${name_we}.h\$|${file}|g" coverage.info
+          done
+
+          lcov --list coverage.info
 
       - name: Upload Coverage to Codecov
         if: matrix.build_type == 'Debug'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: build_${{matrix.build_type}}/coverage.xml
           fail_ci_if_error: true
           verbose: true
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3

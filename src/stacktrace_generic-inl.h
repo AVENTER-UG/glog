@@ -32,18 +32,15 @@
 // Note:  The glibc implementation may cause a call to malloc.
 // This can cause a deadlock in HeapProfiler.
 #include <execinfo.h>
-
-#include <cstring>
-
+#include <string.h>
 #include "stacktrace.h"
 
-namespace google {
-inline namespace glog_internal_namespace_ {
+_START_GOOGLE_NAMESPACE_
 
 // If you change this function, also change GetStackFrames below.
 int GetStackTrace(void** result, int max_depth, int skip_count) {
   static const int kStackLength = 64;
-  void* stack[kStackLength];
+  void * stack[kStackLength];
   int size;
 
   size = backtrace(stack, kStackLength);
@@ -62,5 +59,4 @@ int GetStackTrace(void** result, int max_depth, int skip_count) {
   return result_count;
 }
 
-}  // namespace glog_internal_namespace_
-}  // namespace google
+_END_GOOGLE_NAMESPACE_

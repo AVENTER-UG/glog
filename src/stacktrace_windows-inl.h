@@ -31,13 +31,12 @@
 //
 // Windows implementation - just use CaptureStackBackTrace
 
-// clang-format off
-#include <windows.h> // Must come before <dbghelp.h>
+#include "config.h"
+#include "port.h"
+#include "stacktrace.h"
 #include <dbghelp.h>
-// clang-format on
 
-namespace google {
-inline namespace glog_internal_namespace_ {
+_START_GOOGLE_NAMESPACE_
 
 int GetStackTrace(void** result, int max_depth, int skip_count) {
   if (max_depth > 64) {
@@ -45,9 +44,7 @@ int GetStackTrace(void** result, int max_depth, int skip_count) {
   }
   skip_count++;  // we want to skip the current frame as well
   // This API is thread-safe (moreover it walks only the current thread).
-  return CaptureStackBackTrace(static_cast<DWORD>(skip_count),
-                               static_cast<DWORD>(max_depth), result, nullptr);
+  return CaptureStackBackTrace(static_cast<DWORD>(skip_count), static_cast<DWORD>(max_depth), result, NULL);
 }
 
-}  // namespace glog_internal_namespace_
-}  // namespace google
+_END_GOOGLE_NAMESPACE_

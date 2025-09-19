@@ -1,4 +1,4 @@
-// Copyright (c) 2024, Google Inc.
+// Copyright (c) 2007, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -27,8 +27,9 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: Sergiu Deitsch
+// Author: Sergey Ioffe
 
-#include <glog/stl_logging.h>
+#define GOOGLE_STRIP_LOG 10
 
-int main() {}
+// Include the actual test.
+#include "logging_striptest_main.cc"
