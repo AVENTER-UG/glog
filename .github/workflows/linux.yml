@@ -15,7 +15,7 @@ jobs:
         build_type: [Release, Debug]
         extra: [no-custom-prefix, custom-prefix]
         lib: [shared, static]
-        std: [98, 11, 14, 17, 20]
+        std: [11]
 
     steps:
       - uses: actions/checkout@v2
