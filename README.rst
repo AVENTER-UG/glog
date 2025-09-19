@@ -3,14 +3,14 @@
 
 ## Funding
 
-[![](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=H553XE4QJ9GJ8)
+.. image:: https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif
+   :target: https://www.paypal.com/donate/?hosted_button_id=H553XE4QJ9GJ8
+   :alt: Donate with PayPal
 
 -------------
 
 Google Logging Library
 ======================
-
-|Linux Github actions| |Windows Github actions| |macOS Github actions| |Total alerts| |Language grade: C++| |Codecov|
 
 Google Logging (glog) is a C++98 library that implements application-level
 logging. The library provides logging APIs based on C++-style streams and
