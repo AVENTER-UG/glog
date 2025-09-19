@@ -33,7 +33,7 @@ jobs:
 
       - name: Cache GTest
         id: cache-gtest
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: gtest/
           key: ${{runner.os}}-gtest-1.11
