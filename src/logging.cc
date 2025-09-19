@@ -1425,6 +1425,18 @@ vector<string> LogCleaner::GetOverdueLogNames(
     closedir(dir);
   }
 
+  // Debug-Ausgabe
+  if (overdue_log_names.empty()) {
+    std::cerr << "[LogCleaner] Keine überfälligen Logs gefunden in: "
+              << log_directory << std::endl;
+  } else {
+    std::cerr << "[LogCleaner] Überfällige Logs (" << overdue_log_names.size()
+              << "):" << std::endl;
+    for (const auto& name : overdue_log_names) {
+      std::cerr << "  - " << name << std::endl;
+    }
+  }
+  
   return overdue_log_names;
 }
 

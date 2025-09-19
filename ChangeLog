@@ -1,3 +1,6 @@
+2025-09-19  AVENTER UG <support@aventer.biz>
+  * Fix: delete old logfiles
+
 2022-04-05  Google Inc. <opensource@google.com>
 
 	* google-glog: version 0.6.0.
