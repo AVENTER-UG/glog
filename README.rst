@@ -1,6 +1,12 @@
 
 ## This is a google log (glog) fork of version 0.6.0
 
+## Funding
+
+[![](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=H553XE4QJ9GJ8)
+
+-------------
+
 Google Logging Library
 ======================
 
